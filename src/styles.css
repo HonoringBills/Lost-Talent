@@ -193,3 +193,98 @@ footer { border-top: 1px solid var(--line-soft); background: #090909; padding: 3
   .roster-inputs label { grid-template-columns: 1fr; gap: 2px; }
   .integrity-metrics { grid-template-columns: repeat(2, 1fr); }
 }
+
+
+/* Official Lost Talent League branding */
+.league-mark {
+  display: block;
+  object-fit: contain;
+}
+.league-brand-hero {
+  display: grid;
+  grid-template-columns: 210px 1fr;
+  gap: 24px;
+  align-items: center;
+  margin-bottom: 26px;
+  padding: 22px;
+  border: 1px solid #4a3b17;
+  background:
+    radial-gradient(circle at 16% 18%, rgba(240,201,90,.12), transparent 32%),
+    linear-gradient(145deg, #14110b, #090909 62%);
+  box-shadow: inset 0 0 40px rgba(214,173,69,.04), var(--shadow);
+  position: relative;
+  overflow: hidden;
+}
+.league-brand-hero:after {
+  content: "";
+  position: absolute;
+  inset: auto -50px -90px auto;
+  width: 240px;
+  height: 240px;
+  border: 1px solid rgba(214,173,69,.08);
+  transform: rotate(45deg);
+}
+.league-brand-logo {
+  width: 190px;
+  max-width: 100%;
+  filter: drop-shadow(0 15px 30px rgba(214,173,69,.12));
+  position: relative;
+  z-index: 1;
+}
+.league-brand-hero h2 {
+  margin: 7px 0 7px;
+  font-size: 34px;
+  letter-spacing: -.035em;
+}
+.league-brand-hero p {
+  margin: 0;
+  max-width: 620px;
+  color: var(--muted);
+  line-height: 1.65;
+  font-size: 11px;
+}
+.tournament-brand {
+  margin-bottom: 22px;
+}
+.stat-banner-brand {
+  display: grid;
+  grid-template-columns: 62px 1fr;
+  gap: 13px;
+  align-items: center;
+}
+.stat-logo {
+  width: 58px;
+  height: 58px;
+  border: 1px solid #493b19;
+  background: #0b0b0b;
+}
+.verification-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  margin: -8px 0 20px;
+  padding: 8px 12px 8px 8px;
+  border: 1px solid #342c1b;
+  background: #100e09;
+  color: #a99b72;
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: .04em;
+}
+.verification-logo {
+  width: 42px;
+  height: 42px;
+}
+@media (max-width: 700px) {
+  .league-brand-hero {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
+  .league-brand-logo {
+    width: 170px;
+  }
+  .league-brand-hero p {
+    max-width: 520px;
+  }
+}
