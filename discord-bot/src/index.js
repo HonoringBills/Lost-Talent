@@ -9,9 +9,10 @@ import {
 } from 'discord.js'
 import { createClient } from '@supabase/supabase-js'
 
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
+
 const required = [
   'DISCORD_TOKEN',
-  'VITE_SUPABASE_URL',
   'SUPABASE_SECRET_KEY',
   'ORG_GUILD_ID',
   'LEAGUE_GUILD_ID',
@@ -19,6 +20,7 @@ const required = [
   'LTL_EVENT_SECRET',
 ]
 const missing = required.filter((key) => !process.env[key])
+if (!supabaseUrl) missing.push('SUPABASE_URL')
 if (missing.length) {
   console.error(`Missing environment variables: ${missing.join(', ')}`)
   process.exit(1)
@@ -28,7 +30,7 @@ const discord = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
 })
 
-const db = createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABASE_SECRET_KEY, {
+const db = createClient(supabaseUrl, process.env.SUPABASE_SECRET_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 })
 
