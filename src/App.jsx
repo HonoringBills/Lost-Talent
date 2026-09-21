@@ -1,12 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Link, NavLink, Route, Routes } from 'react-router-dom'
-import {
-  getCurrentSession,
-  signInWithDiscord,
-  submitActivisionVerification,
-  supabaseConfigured,
-} from './supabase.js'
-
 const orgTeams = [
   { name: 'Lost Talent COD', game: 'Call of Duty', record: '12-4', status: 'Primary Roster', players: ['Player One', 'Player Two', 'Player Three', 'Player Four'] },
   { name: 'Lost Talent Academy', game: 'Call of Duty', record: '8-6', status: 'Development', players: ['Academy One', 'Academy Two', 'Academy Three', 'Academy Four'] },
@@ -81,7 +74,6 @@ function Layout({ children }) {
             {nav.map(([to, label]) => <NavLink key={to} to={to} end={to === '/'}>{label}</NavLink>)}
           </nav>
           <div className="header-actions">
-            <Link className="button ghost" to="/verify">Verify</Link>
             <Link className="button gold" to="/register">Register</Link>
           </div>
         </div>
@@ -92,7 +84,7 @@ function Layout({ children }) {
           <div className="footer-brand"><BrandMark small /><div><b>Lost Talent</b><span>Organization + competitive ecosystem</span></div></div>
           <div><b>Platform</b><Link to="/league">Lost Talent League</Link><Link to="/tournaments">Tournaments</Link><Link to="/eights">8s</Link></div>
           <div><b>Community</b><Link to="/teams">Teams</Link><Link to="/merch">Merch</Link><Link to="/about">About</Link></div>
-          <div><b>Players</b><Link to="/verify">Verification</Link><Link to="/register">Team Registration</Link><Link to="/stats">Stats</Link></div>
+          <div><b>Players</b><Link to="/verify">Player Onboarding</Link><Link to="/register">Team Registration</Link><Link to="/stats">Stats</Link></div>
         </div>
       </footer>
     </div>
@@ -161,7 +153,7 @@ function Home() {
     <section className="shell battle-cta">
       <div className="battle-cta-mark"><LeagueMark /></div>
       <div className="battle-cta-copy"><span className="kicker">NO NAME CARRIES YOU HERE</span><h2>PROVE YOU BELONG.</h2><p>Verify once. Build your history. Compete across league play, tournaments and 8s under one permanent player identity.</p></div>
-      <div className="battle-cta-actions"><Link className="button gold" to="/verify">Verify Player</Link><Link className="button ghost" to="/register">Register Team</Link></div>
+      <div className="battle-cta-actions"><Link className="button gold" to="/verify">How Verification Works</Link><Link className="button ghost" to="/register">Register Team</Link></div>
     </section>
   </>
 }
@@ -235,44 +227,17 @@ function Leaderboard({ title, guild, players }) {
 }
 
 function Verify() {
-  const [session, setSession] = useState(null)
-  const [activisionId, setActivisionId] = useState('')
-  const [status, setStatus] = useState('')
-
-  useEffect(() => {
-    getCurrentSession().then(({ data }) => setSession(data.session))
-  }, [])
-
-  const discordIdentity = useMemo(() => session?.user?.identities?.find(identity => identity.provider === 'discord'), [session])
-  const discordId = discordIdentity?.provider_id || discordIdentity?.identity_data?.user_id || null
-
-  async function handleDiscord() {
-    const { error } = await signInWithDiscord()
-    if (error) setStatus(error.message)
-  }
-
-  async function handleVerification(e) {
-    e.preventDefault()
-    if (!activisionId.includes('#')) {
-      setStatus('Enter the full Activision ID including the #numbers.')
-      return
-    }
-    const { data, error } = await submitActivisionVerification(activisionId)
-    if (error) return setStatus(error.message)
-    setStatus(data?.mock ? 'Mock mode: verification flow is ready; connect Supabase to store it.' : 'Verification submitted successfully.')
-  }
-
-  return <Page title="Player Verification" kicker="IDENTITY FIRST" copy="Players connect Discord once, then verify an Activision ID. Captains can later register them using only the Activision ID and the bot can resolve the linked Discord member automatically.">
+  return <Page title="Player Onboarding" kicker="DISCORD-FIRST IDENTITY" copy="Player verification begins automatically when you join a Lost Talent Discord server. The website is not the primary verification gate.">
     <div className="verification-brand"><LeagueMark className="verification-logo" /><span>Official Lost Talent League player identity</span></div>
     <div className="verification-flow">
-      <div className="verify-step card"><span>01</span><h3>Connect Discord</h3><p>Discord OAuth establishes the immutable Discord account behind the player profile.</p><button className="button gold full" onClick={handleDiscord}>{session ? 'Discord Connected' : 'Connect Discord'}</button>{session && <small className="success">Connected user: {discordId || 'Discord identity found'}</small>}</div>
+      <div className="verify-step card"><span>01</span><h3>Join Discord</h3><p>The Lost Talent bot checks whether your Discord ID already belongs to a verified player profile. Returning verified players have active role entitlements restored automatically.</p></div>
       <div className="connector-line">→</div>
-      <form className="verify-step card" onSubmit={handleVerification}><span>02</span><h3>Verify Activision ID</h3><p>This becomes the roster-facing identifier captains use during league and tournament registration.</p><input value={activisionId} onChange={e=>setActivisionId(e.target.value)} placeholder="Gamertag#1234567" /><button className="button gold full" type="submit">Submit Verification</button></form>
+      <div className="verify-step card"><span>02</span><h3>Complete the Intent Form</h3><p>New players receive a one-time DM link asking for their Activision ID and what they are joining for. The link is tied to the Discord account that received it.</p><div className="identity-code">DISCORD → ACTIVISION → PLAYER</div></div>
       <div className="connector-line">→</div>
-      <div className="verify-step card"><span>03</span><h3>One Player Identity</h3><p>Discord ID, Activision history, league stats, tournament stats, 8s ELO and roster history all point to one profile.</p><div className="identity-code">ACTI → PROFILE → DISCORD</div></div>
+      <div className="verify-step card"><span>03</span><h3>Roles Resolve Automatically</h3><p>If your Activision ID is already on an approved league or tournament registration, the system resolves that pending slot to your Discord identity and queues the correct roles automatically.</p></div>
     </div>
-    {status && <div className="notice">{status}</div>}
-    <div className="card architecture-note"><b>Production behavior</b><p>When a roster transaction is approved, the database commits first. A Discord sync job is then queued to add/remove roles. Failed Discord actions remain retryable without losing the actual roster transaction.</p></div>
+    <div className="card architecture-note"><b>Didn't receive the DM?</b><p>Keep DMs from server members enabled or ask Lost Talent staff to resend your one-time onboarding link. You do not need to manually give a captain your Discord ID.</p></div>
+    <div className="notice"><b>League-integrity security:</b> the one-time form clearly discloses a privacy-preserving network-fingerprint check used to surface possible duplicate accounts for staff review. A match is not automatic proof of an alt account and does not automatically apply discipline.</div>
   </Page>
 }
 
