@@ -53,6 +53,10 @@ function BrandMark({ small = false }) {
   return <div className={small ? 'brand-mark brand-mark-small' : 'brand-mark'}>LT</div>
 }
 
+function LeagueMark({ className = '' }) {
+  return <img className={`league-mark ${className}`} src="/ltl-logo.webp" alt="Lost Talent League" />
+}
+
 function Layout({ children }) {
   const nav = [
     ['/', 'Home'],
@@ -149,6 +153,14 @@ function Teams() {
 
 function League() {
   return <Page title="Lost Talent League" kicker="LTL • SEASON 1" copy="The seasonal competition hub: registration, verified rosters, standings, schedules, reporting, playoffs and league-only statistics.">
+    <div className="league-brand-hero">
+      <LeagueMark className="league-brand-logo" />
+      <div>
+        <span className="kicker">OFFICIAL LEAGUE</span>
+        <h2>Lost Talent League</h2>
+        <p>Black-and-gold competition identity for seasons, standings, verified rosters, stats and playoffs.</p>
+      </div>
+    </div>
     <div className="subnav"><span className="active">Overview</span><span>Standings</span><span>Schedule</span><span>Playoffs</span><span>Rules</span></div>
     <div className="split-layout">
       <div>
@@ -165,6 +177,14 @@ function League() {
 
 function Tournaments() {
   return <Page title="LTL Tournaments" kicker="EVENTS" copy="Standalone events get their own registrations, event rosters, brackets, match history and stat scope — separate from league-season data.">
+    <div className="league-brand-hero tournament-brand">
+      <LeagueMark className="league-brand-logo" />
+      <div>
+        <span className="kicker">LOST TALENT LEAGUE EVENTS</span>
+        <h2>Tournament Center</h2>
+        <p>Each tournament uses the LTL identity while maintaining independent registrations, brackets and tournament-only stats.</p>
+      </div>
+    </div>
     <div className="card-grid three">{tournaments.map(t => <article className="card tournament-card" key={t.name}><div className="date-box">{t.date.split(' ').map(x=><b key={x}>{x}</b>)}</div><div><span className="pill gold-pill">{t.status}</span><h3>{t.name}</h3><p>{t.format}</p><div className="metric-row"><span>Teams <b>{t.teams}</b></span><span>Stats <b>{t.scope}</b></span></div></div></article>)}</div>
     <section className="inner-section">
       <SectionHeader kicker="EVENT FLOW" title="Tournament operations" copy="Each event can use its own format, ruleset and roster without mutating league standings or league stat leaderboards." />
@@ -178,7 +198,7 @@ function Stats() {
   const label = scope === 'league' ? 'League' : scope === 'tournament' ? 'Tournament' : 'Combined'
   return <Page title="Player Statistics" kicker="DATA CENTER" copy="Switch scope without mixing competition types. League and tournament source records stay independent in PostgreSQL.">
     <div className="scope-toggle">{['league','tournament','combined'].map(s => <button className={scope===s?'active':''} onClick={()=>setScope(s)} key={s}>{s[0].toUpperCase()+s.slice(1)}</button>)}</div>
-    <div className="stat-banner"><span className="kicker">CURRENT VIEW</span><h3>{label} Stats</h3><p>{scope === 'league' ? 'Only matches attached to an LTL season.' : scope === 'tournament' ? 'Only standalone tournament matches.' : 'Career rollup across both scopes.'}</p></div>
+    <div className="stat-banner"><div className="stat-banner-brand"><LeagueMark className="stat-logo" /><div><span className="kicker">CURRENT VIEW</span><h3>{label} Stats</h3><p>{scope === 'league' ? 'Only matches attached to an LTL season.' : scope === 'tournament' ? 'Only standalone tournament matches.' : 'Career rollup across both scopes.'}</p></div></div></div>
     <div className="table-card"><div className="table-row stats-row table-head"><span>#</span><span>Player</span><span>K/D</span><span>SPM</span><span>Maps</span><span>MVP</span></div>{statRows[scope].map(r => <div className="table-row stats-row" key={r[1]}>{r.map((v,i)=><span key={i}>{v}</span>)}</div>)}</div>
   </Page>
 }
@@ -222,6 +242,7 @@ function Verify() {
   }
 
   return <Page title="Player Verification" kicker="IDENTITY FIRST" copy="Players connect Discord once, then verify an Activision ID. Captains can later register them using only the Activision ID and the bot can resolve the linked Discord member automatically.">
+    <div className="verification-brand"><LeagueMark className="verification-logo" /><span>Official Lost Talent League player identity</span></div>
     <div className="verification-flow">
       <div className="verify-step card"><span>01</span><h3>Connect Discord</h3><p>Discord OAuth establishes the immutable Discord account behind the player profile.</p><button className="button gold full" onClick={handleDiscord}>{session ? 'Discord Connected' : 'Connect Discord'}</button>{session && <small className="success">Connected user: {discordId || 'Discord identity found'}</small>}</div>
       <div className="connector-line">→</div>
