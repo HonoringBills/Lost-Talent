@@ -6,13 +6,15 @@
 create extension if not exists pgcrypto;
 
 create table if not exists public.profiles (
-  id uuid primary key references auth.users(id) on delete cascade,
+  id uuid primary key default gen_random_uuid(),
+  auth_user_id uuid unique references auth.users(id) on delete set null,
   display_name text,
   discord_user_id text unique,
   discord_username text,
   activision_id text,
   activision_key text unique,
-  verification_status text not null default 'unverified' check (verification_status in ('unverified','pending','verified','rejected')),
+  primary_intent text,
+  verification_status text not null default 'unverified' check (verification_status in ('unverified','pending','verified','rejected','review')),
   verified_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -222,7 +224,7 @@ create table if not exists public.discord_sync_jobs (
   action text not null check (action in ('add_role','remove_role','sync_member')),
   discord_role_id text,
   payload jsonb not null default '{}'::jsonb,
-  status text not null default 'queued' check (status in ('queued','processing','complete','failed')),
+  status text not null default 'queued' check (status in ('queued','processing','complete','failed','waiting_for_member')),
   attempts integer not null default 0,
   last_error text,
   next_attempt_at timestamptz not null default now(),
@@ -295,6 +297,99 @@ create table if not exists public.audit_log (
 );
 create index if not exists audit_log_entity_idx on public.audit_log(entity_type, entity_id, created_at desc);
 
+-- Discord-first onboarding / intent verification.
+create table if not exists public.verification_tokens (
+  id uuid primary key default gen_random_uuid(),
+  guild_scope text not null check (guild_scope in ('org','league')),
+  discord_user_id text not null,
+  token_hash text not null unique,
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null,
+  used_at timestamptz
+);
+create index if not exists verification_tokens_lookup_idx
+  on public.verification_tokens(token_hash, used_at, expires_at);
+
+create table if not exists public.network_verifications (
+  id uuid primary key default gen_random_uuid(),
+  profile_id uuid not null references public.profiles(id) on delete cascade,
+  guild_scope text not null check (guild_scope in ('org','league')),
+  discord_user_id text not null,
+  activision_key text not null,
+  intent text,
+  ip_fingerprint text not null,
+  ip_ciphertext text not null,
+  ip_iv text not null,
+  ip_key_version integer not null default 1,
+  user_agent_hash text,
+  verified_at timestamptz not null default now(),
+  last_seen_at timestamptz not null default now(),
+  active_in_guild boolean not null default true,
+  left_at timestamptz
+);
+create index if not exists network_verifications_fingerprint_idx
+  on public.network_verifications(guild_scope, ip_fingerprint, last_seen_at desc);
+create index if not exists network_verifications_discord_idx
+  on public.network_verifications(guild_scope, discord_user_id, last_seen_at desc);
+
+create table if not exists public.alt_detection_flags (
+  id uuid primary key default gen_random_uuid(),
+  guild_scope text not null check (guild_scope in ('org','league')),
+  discord_user_id text not null,
+  matched_discord_user_id text not null,
+  ip_fingerprint text,
+  reason text not null default 'shared_network_fingerprint',
+  detected_at timestamptz not null default now(),
+  resolved_at timestamptz,
+  resolution_note text,
+  alert_message_id text,
+  unique(guild_scope, discord_user_id, matched_discord_user_id, ip_fingerprint)
+);
+
+-- Registration slots intentionally allow an Activision ID to be registered before
+-- the player has joined Discord or completed identity verification.
+create table if not exists public.roster_registration_slots (
+  id uuid primary key default gen_random_uuid(),
+  scope text not null check (scope in ('league','tournament','org')),
+  league_team_id uuid references public.league_teams(id) on delete cascade,
+  tournament_entry_id uuid references public.tournament_entries(id) on delete cascade,
+  org_team_id uuid references public.org_teams(id) on delete cascade,
+  activision_id text not null,
+  activision_key text not null,
+  profile_id uuid references public.profiles(id) on delete set null,
+  roster_role text not null default 'starter',
+  resolution_status text not null default 'pending_identity'
+    check (resolution_status in ('pending_identity','linked','conflict','removed')),
+  approval_status text not null default 'pending'
+    check (approval_status in ('pending','approved','rejected','withdrawn')),
+  approved_at timestamptz,
+  created_at timestamptz not null default now(),
+  check (
+    (scope = 'league' and league_team_id is not null and tournament_entry_id is null and org_team_id is null)
+    or (scope = 'tournament' and tournament_entry_id is not null and league_team_id is null and org_team_id is null)
+    or (scope = 'org' and org_team_id is not null and league_team_id is null and tournament_entry_id is null)
+  )
+);
+create index if not exists roster_registration_slots_acti_idx
+  on public.roster_registration_slots(activision_key, approval_status, resolution_status);
+
+-- Durable entitlements survive a player leaving Discord. When they rejoin, the bot
+-- reconciles these rows and restores every active role they are entitled to.
+create table if not exists public.discord_role_entitlements (
+  id uuid primary key default gen_random_uuid(),
+  profile_id uuid not null references public.profiles(id) on delete cascade,
+  guild_scope text not null check (guild_scope in ('org','league')),
+  discord_role_id text not null,
+  source_type text not null,
+  source_id text not null default '',
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  revoked_at timestamptz,
+  unique(profile_id, guild_scope, discord_role_id, source_type, source_id)
+);
+create index if not exists discord_role_entitlements_profile_idx
+  on public.discord_role_entitlements(profile_id, guild_scope, active);
+
 alter table public.profiles enable row level security;
 alter table public.activision_aliases enable row level security;
 alter table public.staff_members enable row level security;
@@ -318,6 +413,11 @@ alter table public.integrity_reviews enable row level security;
 alter table public.integrity_review_notes enable row level security;
 alter table public.player_rank_history enable row level security;
 alter table public.audit_log enable row level security;
+alter table public.verification_tokens enable row level security;
+alter table public.network_verifications enable row level security;
+alter table public.alt_detection_flags enable row level security;
+alter table public.roster_registration_slots enable row level security;
+alter table public.discord_role_entitlements enable row level security;
 
 revoke all on table public.profiles from anon, authenticated;
 grant select, update on table public.profiles to authenticated;
@@ -325,95 +425,14 @@ grant select, update on table public.profiles to authenticated;
 create policy "players can read their own profile"
 on public.profiles for select
 to authenticated
-using ((select auth.uid()) = id);
+using ((select auth.uid()) = auth_user_id);
 
 create policy "players can update limited own profile row"
 on public.profiles for update
 to authenticated
-using ((select auth.uid()) = id)
-with check ((select auth.uid()) = id);
+using ((select auth.uid()) = auth_user_id)
+with check ((select auth.uid()) = auth_user_id);
 
-create or replace function public.verify_player_identity(p_activision_id text)
-returns jsonb
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_uid uuid := auth.uid();
-  v_discord_id text;
-  v_discord_username text;
-  v_activision_display text := btrim(p_activision_id);
-  v_activision_key text := lower(btrim(p_activision_id));
-  v_old_activision text;
-  v_old_key text;
-begin
-  if v_uid is null then
-    raise exception 'Authentication required';
-  end if;
-
-  if v_activision_display is null or length(v_activision_display) < 3 or position('#' in v_activision_display) = 0 then
-    raise exception 'Full Activision ID including # is required';
-  end if;
-
-  select i.provider_id,
-         coalesce(i.identity_data ->> 'full_name', i.identity_data ->> 'name', i.identity_data ->> 'preferred_username')
-    into v_discord_id, v_discord_username
-  from auth.identities i
-  where i.user_id = v_uid and i.provider = 'discord'
-  order by i.last_sign_in_at desc nulls last
-  limit 1;
-
-  if v_discord_id is null then
-    raise exception 'Discord identity is required before Activision verification';
-  end if;
-
-  select p.activision_id, p.activision_key
-    into v_old_activision, v_old_key
-  from public.profiles p
-  where p.id = v_uid;
-
-  if exists (
-    select 1 from public.profiles p
-    where p.activision_key = v_activision_key and p.id <> v_uid
-  ) then
-    raise exception 'That Activision ID is already linked to another verified profile';
-  end if;
-
-  insert into public.profiles (
-    id, discord_user_id, discord_username, activision_id, activision_key,
-    verification_status, verified_at, updated_at
-  ) values (
-    v_uid, v_discord_id, v_discord_username, v_activision_display, v_activision_key,
-    'verified', now(), now()
-  )
-  on conflict (id) do update set
-    discord_user_id = excluded.discord_user_id,
-    discord_username = excluded.discord_username,
-    activision_id = excluded.activision_id,
-    activision_key = excluded.activision_key,
-    verification_status = 'verified',
-    verified_at = now(),
-    updated_at = now();
-
-  if v_old_key is not null and v_old_key <> v_activision_key then
-    insert into public.activision_aliases(profile_id, activision_id, activision_key, last_seen_at)
-    values (v_uid, v_old_activision, v_old_key, now())
-    on conflict (profile_id, activision_key) do update set last_seen_at = now();
-  end if;
-
-  insert into public.activision_aliases(profile_id, activision_id, activision_key)
-  values (v_uid, v_activision_display, v_activision_key)
-  on conflict (profile_id, activision_key) do update set last_seen_at = null;
-
-  return jsonb_build_object(
-    'profile_id', v_uid,
-    'discord_user_id', v_discord_id,
-    'activision_id', v_activision_display,
-    'verification_status', 'verified'
-  );
-end;
-$$;
-
-revoke all on function public.verify_player_identity(text) from public, anon;
-grant execute on function public.verify_player_identity(text) to authenticated;
+-- Player identity verification is completed by the Discord-bound Cloudflare
+-- onboarding flow. There is intentionally no public RPC that can mark a profile verified
+-- without passing the one-time Discord token and network-security step.
