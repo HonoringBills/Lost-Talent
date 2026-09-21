@@ -1,0 +1,14 @@
+{
+  "name": "lost-talent-discord-bot",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "check": "node --check src/index.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.116.0",
+    "discord.js": "14.27.0"
+  }
+}
