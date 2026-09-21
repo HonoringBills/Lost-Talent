@@ -106,17 +106,32 @@ function SectionHeader({ kicker, title, copy, action }) {
 function Home() {
   return <>
     <section className="hero">
+      <div className="hero-atmosphere" aria-hidden="true">
+        {Array.from({ length: 14 }, (_, i) => <span key={i} />)}
+      </div>
       <div className="shell hero-grid">
-        <div>
-          <span className="kicker">LOST TALENT ESPORTS</span>
+        <div className="hero-copy">
+          <span className="eyebrow-badge">LOST TALENT ESPORTS // COMPETE • PROVE • CLIMB</span>
           <h1>BUILT FOR THE<br/><em>ONES OVERLOOKED.</em></h1>
-          <p>Lost Talent is the organization. Lost Talent League is the competitive ecosystem underneath it — leagues, tournaments, 8s, stats, verified players and Discord-connected roster operations in one platform.</p>
-          <div className="hero-actions"><Link className="button gold" to="/teams">Meet the Teams</Link><Link className="button ghost" to="/league">Enter LTL</Link></div>
+          <p>Lost Talent is the organization. Lost Talent League is where the overlooked get a stage — seasons, tournaments, 8s, verified competition and stats that actually tell the story.</p>
+          <div className="hero-actions"><Link className="button gold hero-primary" to="/league">Enter the League</Link><Link className="button ghost" to="/teams">View Lost Talent</Link></div>
+          <div className="hero-proof">
+            <div><span>01</span><b>ORG</b><small>Lost Talent</small></div>
+            <div><span>02</span><b>LEAGUE</b><small>Season Competition</small></div>
+            <div><span>03</span><b>EVENTS</b><small>Tournaments + 8s</small></div>
+          </div>
         </div>
-        <div className="feature-panel gold-edge">
-          <div className="panel-top"><span>FEATURED MATCH</span><b>UPCOMING</b></div>
-          <div className="matchup"><div><BrandMark /><b>LOST TALENT</b></div><strong>VS</strong><div><div className="opponent-mark">NS</div><b>NORTHSTAR</b></div></div>
-          <div className="match-meta"><span>Sep 24 • 9:00 PM ET</span><span>BO5 • LTL Season 1</span></div>
+        <div className="hero-visual">
+          <div className="hero-logo-stage">
+            <div className="logo-aura" />
+            <LeagueMark className="hero-ltl-logo" />
+            <div className="hero-logo-caption"><span>OFFICIAL COMPETITION MARK</span><b>LOST TALENT LEAGUE</b></div>
+          </div>
+          <div className="feature-panel hero-match-card gold-edge">
+            <div className="panel-top"><span>FEATURED MATCH</span><b><i /> UPCOMING</b></div>
+            <div className="matchup"><div><BrandMark /><b>LOST TALENT</b></div><strong>VS</strong><div><div className="opponent-mark">NS</div><b>NORTHSTAR</b></div></div>
+            <div className="match-meta"><span>SEP 24 • 9:00 PM ET</span><span>BO5 • LTL SEASON 1</span></div>
+          </div>
         </div>
       </div>
     </section>
@@ -142,6 +157,12 @@ function Home() {
         <div className="card feature-card"><span className="number">03</span><h3>Combined Career</h3><p>Optional career rollups across league + tournament play without overwriting either source.</p></div>
       </div>
     </div></section>
+
+    <section className="shell battle-cta">
+      <div className="battle-cta-mark"><LeagueMark /></div>
+      <div className="battle-cta-copy"><span className="kicker">NO NAME CARRIES YOU HERE</span><h2>PROVE YOU BELONG.</h2><p>Verify once. Build your history. Compete across league play, tournaments and 8s under one permanent player identity.</p></div>
+      <div className="battle-cta-actions"><Link className="button gold" to="/verify">Verify Player</Link><Link className="button ghost" to="/register">Register Team</Link></div>
+    </section>
   </>
 }
 
