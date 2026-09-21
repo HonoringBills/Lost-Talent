@@ -1,0 +1,43 @@
+name: Validate Lost Talent
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Install web dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build web app
+        run: npm run build
+
+  discord-bot:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: discord-bot
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Install bot dependencies
+        run: npm install --no-audit --no-fund
+      - name: Syntax check bot
+        run: npm run check
