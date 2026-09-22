@@ -30,6 +30,7 @@ jobs:
           node --check functions/api/verification/complete.js
           node --check functions/api/verification/member-leave.js
           node --check functions/verify.js
+          node --check worker/index.js
 
   discord-bot:
     runs-on: ubuntu-latest
