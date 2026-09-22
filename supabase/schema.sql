@@ -390,6 +390,29 @@ create table if not exists public.discord_role_entitlements (
 create index if not exists discord_role_entitlements_profile_idx
   on public.discord_role_entitlements(profile_id, guild_scope, active);
 
+-- One-time Discord installer stores the infrastructure it creates so staff never
+-- needs to manually copy role/channel IDs into the application.
+create table if not exists public.discord_guild_configs (
+  guild_id text primary key,
+  guild_name text,
+  combined_org_league boolean not null default true,
+  system_category_id text,
+  verify_channel_id text,
+  security_alert_channel_id text,
+  bot_logs_channel_id text,
+  staff_role_id text,
+  verified_role_id text,
+  unverified_role_id text,
+  free_agent_role_id text,
+  captain_role_id text,
+  league_player_role_id text,
+  tournament_player_role_id text,
+  eights_role_id text,
+  configured_by_discord_id text,
+  configured_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 alter table public.profiles enable row level security;
 alter table public.activision_aliases enable row level security;
 alter table public.staff_members enable row level security;
@@ -418,6 +441,7 @@ alter table public.network_verifications enable row level security;
 alter table public.alt_detection_flags enable row level security;
 alter table public.roster_registration_slots enable row level security;
 alter table public.discord_role_entitlements enable row level security;
+alter table public.discord_guild_configs enable row level security;
 
 revoke all on table public.profiles from anon, authenticated;
 grant select, update on table public.profiles to authenticated;
