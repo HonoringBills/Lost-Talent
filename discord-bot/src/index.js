@@ -2,27 +2,35 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ChannelType,
   Client,
   EmbedBuilder,
   Events,
   GatewayIntentBits,
+  OverwriteType,
+  PermissionFlagsBits,
+  PermissionsBitField,
 } from 'discord.js'
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
+const DEFAULT_GUILD_ID = '1537667566502154381'
+const primaryGuildId = String(
+  process.env.PRIMARY_GUILD_ID
+  || process.env.LEAGUE_GUILD_ID
+  || process.env.ORG_GUILD_ID
+  || DEFAULT_GUILD_ID,
+).trim()
 
-const required = [
-  'DISCORD_TOKEN',
-  'SUPABASE_SECRET_KEY',
-  'ORG_GUILD_ID',
-  'LEAGUE_GUILD_ID',
-  'LTL_API_URL',
-  'LTL_EVENT_SECRET',
-]
-const missing = required.filter((key) => !process.env[key])
-if (!supabaseUrl) missing.push('SUPABASE_URL')
-if (missing.length) {
-  console.error(`Missing environment variables: ${missing.join(', ')}`)
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
+const supabaseKey = process.env.SUPABASE_SECRET_KEY || ''
+const db = supabaseUrl && supabaseKey
+  ? createClient(supabaseUrl, supabaseKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    })
+  : null
+
+if (!process.env.DISCORD_TOKEN) {
+  console.error('Missing environment variable: DISCORD_TOKEN')
   process.exit(1)
 }
 
@@ -30,19 +38,21 @@ const discord = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
 })
 
-const db = createClient(supabaseUrl, process.env.SUPABASE_SECRET_KEY, {
-  auth: { persistSession: false, autoRefreshToken: false },
-})
-
 const guildIds = {
-  org: process.env.ORG_GUILD_ID,
-  league: process.env.LEAGUE_GUILD_ID,
+  org: process.env.ORG_GUILD_ID || primaryGuildId,
+  league: process.env.LEAGUE_GUILD_ID || primaryGuildId,
 }
 
 function scopeForGuild(guildId) {
-  if (String(guildId) === String(guildIds.org)) return 'org'
-  if (String(guildId) === String(guildIds.league)) return 'league'
+  const id = String(guildId)
+  if (id === primaryGuildId) return 'league'
+  if (id === String(guildIds.league)) return 'league'
+  if (id === String(guildIds.org)) return 'org'
   return null
+}
+
+function apiConfigured() {
+  return Boolean(process.env.LTL_API_URL && process.env.LTL_EVENT_SECRET)
 }
 
 function unverifiedRole(scope) {
@@ -62,6 +72,7 @@ function verifiedRole(scope) {
 }
 
 async function api(path, body) {
+  if (!apiConfigured()) throw new Error('LTL_API_URL / LTL_EVENT_SECRET are not configured yet.')
   const response = await fetch(`${String(process.env.LTL_API_URL).replace(/\/$/, '')}${path}`, {
     method: 'POST',
     headers: {
@@ -78,6 +89,7 @@ async function api(path, body) {
 }
 
 async function loadProfile(profileId) {
+  if (!db) throw new Error('Supabase is not configured.')
   const { data, error } = await db
     .from('profiles')
     .select('id, discord_user_id, activision_id, activision_key, verification_status')
@@ -89,6 +101,7 @@ async function loadProfile(profileId) {
 }
 
 async function loadProfileByDiscord(discordUserId) {
+  if (!db) return null
   const { data, error } = await db
     .from('profiles')
     .select('id, discord_user_id, activision_id, activision_key, verification_status')
@@ -99,6 +112,7 @@ async function loadProfileByDiscord(discordUserId) {
 }
 
 async function loadEntitlements(profileId, scope) {
+  if (!db) return []
   const { data, error } = await db
     .from('discord_role_entitlements')
     .select('discord_role_id, source_type, source_id')
@@ -110,11 +124,13 @@ async function loadEntitlements(profileId, scope) {
 }
 
 async function markJob(jobId, patch) {
+  if (!db) return
   const { error } = await db.from('discord_sync_jobs').update(patch).eq('id', jobId)
   if (error) throw error
 }
 
 async function requeueWaitingJobs(profileId, scope) {
+  if (!db) return
   const { error } = await db
     .from('discord_sync_jobs')
     .update({
@@ -153,6 +169,11 @@ async function reconcileMember(member, profile, scope) {
 }
 
 async function sendIntentVerification(member, scope) {
+  if (!apiConfigured()) {
+    console.warn('Verification API is not configured yet; onboarding DM skipped.')
+    return null
+  }
+
   const pendingRole = unverifiedRole(scope)
   if (pendingRole && !member.roles.cache.has(pendingRole)) {
     await member.roles.add(pendingRole, 'Lost Talent player onboarding').catch(() => null)
@@ -254,6 +275,7 @@ async function processJob(job) {
 }
 
 async function pollSyncJobs() {
+  if (!db) return
   const { data: jobs, error } = await db
     .from('discord_sync_jobs')
     .select('id, profile_id, guild_scope, action, discord_role_id, payload, status, attempts, next_attempt_at')
