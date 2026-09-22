@@ -3,6 +3,7 @@
   "name": "lost-talent",
   "main": "./worker/index.js",
   "compatibility_date": "2026-09-22",
+  "workers_dev": true,
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
