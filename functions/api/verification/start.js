@@ -11,8 +11,11 @@ export async function onRequestPost({ request, env }) {
     return json({ error: 'Invalid Discord user ID.' }, 400)
   }
 
+  const primaryGuild = String(env.PRIMARY_GUILD_ID || '1537667566502154381').trim()
   const expectedGuild = String(
-    guildScope === 'org' ? env.ORG_GUILD_ID : env.LEAGUE_GUILD_ID || '',
+    guildScope === 'org'
+      ? (env.ORG_GUILD_ID || primaryGuild)
+      : (env.LEAGUE_GUILD_ID || primaryGuild),
   ).trim()
 
   if (expectedGuild && String(body.guildId || '') !== expectedGuild) {
