@@ -413,6 +413,37 @@ create table if not exists public.discord_guild_configs (
   updated_at timestamptz not null default now()
 );
 
+-- Foreign-key indexes for roster, match, transaction, and integrity lookups.
+create index if not exists audit_log_actor_profile_idx on public.audit_log(actor_profile_id);
+create index if not exists discord_sync_jobs_profile_idx on public.discord_sync_jobs(profile_id);
+create index if not exists discord_sync_jobs_source_transaction_idx on public.discord_sync_jobs(source_transaction_id);
+create index if not exists eight_ratings_profile_idx on public.eight_ratings(profile_id);
+create index if not exists integrity_review_notes_author_idx on public.integrity_review_notes(author_id);
+create index if not exists integrity_review_notes_review_idx on public.integrity_review_notes(review_id);
+create index if not exists integrity_reviews_opened_by_idx on public.integrity_reviews(opened_by);
+create index if not exists integrity_reviews_profile_idx on public.integrity_reviews(profile_id);
+create index if not exists league_roster_members_profile_idx on public.league_roster_members(profile_id);
+create index if not exists league_teams_captain_profile_idx on public.league_teams(captain_profile_id);
+create index if not exists matches_league_team_a_idx on public.matches(league_team_a_id);
+create index if not exists matches_league_team_b_idx on public.matches(league_team_b_id);
+create index if not exists matches_tournament_entry_a_idx on public.matches(tournament_entry_a_id);
+create index if not exists matches_tournament_entry_b_idx on public.matches(tournament_entry_b_id);
+create index if not exists network_verifications_profile_idx on public.network_verifications(profile_id);
+create index if not exists org_roster_members_profile_idx on public.org_roster_members(profile_id);
+create index if not exists player_rank_history_profile_idx on public.player_rank_history(profile_id);
+create index if not exists roster_registration_slots_league_team_idx on public.roster_registration_slots(league_team_id);
+create index if not exists roster_registration_slots_tournament_entry_idx on public.roster_registration_slots(tournament_entry_id);
+create index if not exists roster_registration_slots_org_team_idx on public.roster_registration_slots(org_team_id);
+create index if not exists roster_registration_slots_profile_idx on public.roster_registration_slots(profile_id);
+create index if not exists roster_transactions_approved_by_idx on public.roster_transactions(approved_by);
+create index if not exists roster_transactions_league_team_idx on public.roster_transactions(league_team_id);
+create index if not exists roster_transactions_tournament_entry_idx on public.roster_transactions(tournament_entry_id);
+create index if not exists roster_transactions_org_team_idx on public.roster_transactions(org_team_id);
+create index if not exists roster_transactions_profile_idx on public.roster_transactions(profile_id);
+create index if not exists roster_transactions_submitted_by_idx on public.roster_transactions(submitted_by);
+create index if not exists tournament_entries_captain_profile_idx on public.tournament_entries(captain_profile_id);
+create index if not exists tournament_roster_members_profile_idx on public.tournament_roster_members(profile_id);
+
 alter table public.profiles enable row level security;
 alter table public.activision_aliases enable row level security;
 alter table public.staff_members enable row level security;
