@@ -613,10 +613,66 @@ async function pollSyncJobs() {
   for (const job of jobs ?? []) await processJob(job)
 }
 
-discord.once(Events.ClientReady, (client) => {
+discord.once(Events.ClientReady, async (client) => {
   console.log(`Lost Talent bot ready as ${client.user.tag}`)
+  console.log('Install URL: ' + inviteUrl(client.user.id))
+
+  const guild = await client.guilds.fetch(primaryGuildId).catch(() => null)
+  if (guild) {
+    await registerGuildCommands(guild).catch((error) => {
+      console.error('Unable to register LTL commands:', error)
+    })
+  }
+
   pollSyncJobs().catch(console.error)
   setInterval(() => pollSyncJobs().catch(console.error), 15_000)
+})
+
+discord.on(Events.InteractionCreate, async (interaction) => {
+  if (!interaction.isChatInputCommand()) return
+  if (!interaction.guild || String(interaction.guild.id) !== primaryGuildId) return
+
+  if (interaction.commandName === 'ltl-setup') {
+    if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
+      await interaction.reply({
+        content: 'Administrator permission is required to run LTL setup.',
+        ephemeral: true,
+      })
+      return
+    }
+
+    await interaction.deferReply({ ephemeral: true })
+
+    try {
+      const result = await setupGuild(interaction.guild, interaction.user.id)
+      await interaction.editReply(
+        result.persisted
+          ? 'LTL setup is complete. Roles/channels were created or reused and their IDs were saved automatically. Check #ltl-bot-logs.'
+          : 'LTL setup is complete. Roles/channels were created or reused. Supabase is not connected yet; the IDs are in #ltl-bot-logs and will persist automatically after rerunning /ltl-setup once the database is connected.',
+      )
+    } catch (error) {
+      console.error('LTL setup failed:', error)
+      await interaction.editReply('LTL setup failed: ' + String(error?.message || error))
+    }
+    return
+  }
+
+  if (interaction.commandName === 'ltl-status') {
+    await interaction.reply({
+      ephemeral: true,
+      embeds: [
+        new EmbedBuilder()
+          .setColor(db && apiConfigured() ? 0x57f287 : 0xfee75c)
+          .setTitle('LTL INTEGRATION STATUS')
+          .setDescription([
+            'Server: **' + interaction.guild.name + '** (\`' + interaction.guild.id + '\`)',
+            'Bot: **online**',
+            'Supabase: **' + (db ? 'connected' : 'not connected') + '**',
+            'Verification API: **' + (apiConfigured() ? 'configured' : 'not configured') + '**',
+          ].join('\n')),
+      ],
+    })
+  }
 })
 
 discord.on(Events.GuildMemberAdd, async (member) => {
@@ -641,7 +697,7 @@ discord.on(Events.GuildMemberAdd, async (member) => {
 })
 
 discord.on(Events.GuildMemberRemove, async (member) => {
-  if (member.user?.bot) return
+  if (member.user?.bot || !apiConfigured()) return
   const scope = scopeForGuild(member.guild.id)
   if (!scope) return
 
