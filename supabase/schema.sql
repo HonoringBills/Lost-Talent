@@ -443,19 +443,28 @@ alter table public.roster_registration_slots enable row level security;
 alter table public.discord_role_entitlements enable row level security;
 alter table public.discord_guild_configs enable row level security;
 
-revoke all on table public.profiles from anon, authenticated;
-grant select, update on table public.profiles to authenticated;
+-- Keep the operational database server-side by default. Public website access
+-- should be added later through deliberately scoped views/RPCs rather than broad table grants.
+revoke all on all tables in schema public from anon, authenticated;
+revoke all on all sequences in schema public from anon, authenticated;
+
+grant select, insert, update, delete on all tables in schema public to service_role;
+grant usage, select on all sequences in schema public to service_role;
+
+-- Future tables should not become writable/readable to browser roles automatically.
+alter default privileges for role postgres in schema public
+  revoke select, insert, update, delete on tables from anon, authenticated;
+alter default privileges for role postgres in schema public
+  revoke usage, select on sequences from anon, authenticated;
+
+-- If a website-authenticated player account is linked later, it may read only its own
+-- profile row. Discord/Activision/verification identity remains server-authoritative.
+grant select on table public.profiles to authenticated;
 
 create policy "players can read their own profile"
 on public.profiles for select
 to authenticated
 using ((select auth.uid()) = auth_user_id);
-
-create policy "players can update limited own profile row"
-on public.profiles for update
-to authenticated
-using ((select auth.uid()) = auth_user_id)
-with check ((select auth.uid()) = auth_user_id);
 
 -- Player identity verification is completed by the Discord-bound Cloudflare
 -- onboarding flow. There is intentionally no public RPC that can mark a profile verified
