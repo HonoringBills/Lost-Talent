@@ -88,6 +88,327 @@ async function api(path, body) {
   return payload
 }
 
+
+function inviteUrl(clientId) {
+  const permissions = new PermissionsBitField([
+    PermissionFlagsBits.ViewChannel,
+    PermissionFlagsBits.SendMessages,
+    PermissionFlagsBits.ReadMessageHistory,
+    PermissionFlagsBits.EmbedLinks,
+    PermissionFlagsBits.ManageRoles,
+    PermissionFlagsBits.ManageChannels,
+  ]).bitfield.toString()
+
+  const query = new URLSearchParams({
+    client_id: String(clientId),
+    scope: 'bot applications.commands',
+    permissions,
+    guild_id: primaryGuildId,
+    disable_guild_select: 'true',
+  })
+
+  return 'https://discord.com/oauth2/authorize?' + query.toString()
+}
+
+async function findOrCreateRole(guild, name, color, options = {}) {
+  await guild.roles.fetch()
+  let role = guild.roles.cache.find((candidate) => candidate.name === name)
+
+  if (!role) {
+    role = await guild.roles.create({
+      name,
+      color,
+      hoist: Boolean(options.hoist),
+      mentionable: Boolean(options.mentionable),
+      reason: 'Lost Talent automated server setup',
+    })
+  }
+
+  return role
+}
+
+async function findOrCreateCategory(guild, name) {
+  await guild.channels.fetch()
+  let category = guild.channels.cache.find(
+    (channel) => channel.type === ChannelType.GuildCategory && channel.name === name,
+  )
+
+  if (!category) {
+    category = await guild.channels.create({
+      name,
+      type: ChannelType.GuildCategory,
+      reason: 'Lost Talent automated server setup',
+    })
+  }
+
+  return category
+}
+
+async function findOrCreateTextChannel(guild, name, parentId, permissionOverwrites) {
+  await guild.channels.fetch()
+  let channel = guild.channels.cache.find(
+    (candidate) => candidate.type === ChannelType.GuildText && candidate.name === name,
+  )
+
+  if (!channel) {
+    channel = await guild.channels.create({
+      name,
+      type: ChannelType.GuildText,
+      parent: parentId,
+      permissionOverwrites,
+      reason: 'Lost Talent automated server setup',
+    })
+  } else {
+    if (channel.parentId !== parentId) {
+      await channel.setParent(parentId, {
+        lockPermissions: false,
+        reason: 'Lost Talent automated server setup',
+      })
+    }
+
+    await channel.permissionOverwrites.set(
+      permissionOverwrites,
+      'Lost Talent automated permission sync',
+    )
+  }
+
+  return channel
+}
+
+function privateStaffOverwrites(guild, staffRoleId) {
+  return [
+    {
+      id: guild.roles.everyone.id,
+      type: OverwriteType.Role,
+      deny: [PermissionFlagsBits.ViewChannel],
+    },
+    {
+      id: staffRoleId,
+      type: OverwriteType.Role,
+      allow: [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.ReadMessageHistory,
+        PermissionFlagsBits.EmbedLinks,
+      ],
+    },
+    {
+      id: discord.user.id,
+      type: OverwriteType.Member,
+      allow: [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.ReadMessageHistory,
+        PermissionFlagsBits.EmbedLinks,
+      ],
+    },
+  ]
+}
+
+function verifyChannelOverwrites(guild, staffRoleId) {
+  return [
+    {
+      id: guild.roles.everyone.id,
+      type: OverwriteType.Role,
+      allow: [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.ReadMessageHistory,
+      ],
+      deny: [PermissionFlagsBits.SendMessages],
+    },
+    {
+      id: staffRoleId,
+      type: OverwriteType.Role,
+      allow: [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.ReadMessageHistory,
+      ],
+    },
+    {
+      id: discord.user.id,
+      type: OverwriteType.Member,
+      allow: [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.ReadMessageHistory,
+        PermissionFlagsBits.EmbedLinks,
+      ],
+    },
+  ]
+}
+
+async function postVerificationInstructions(channel) {
+  const embed = new EmbedBuilder()
+    .setColor(0xd4aa3e)
+    .setTitle('LOST TALENT // PLAYER VERIFICATION')
+    .setDescription([
+      'Player verification is handled automatically by the Lost Talent bot.',
+      '',
+      'When you join, the bot DMs a one-time **Player Intent** link that connects your Discord ID to your Activision ID.',
+      '',
+      '**What this enables**',
+      '• Captains register players by Activision ID only.',
+      '• Approved roster roles apply automatically.',
+      '• Returning verified players can have active roles restored on rejoin.',
+      '• Duplicate-account signals go to staff review, never automatic punishment.',
+      '',
+      'If you did not receive the DM, contact LTL Staff.',
+    ].join('\n'))
+    .setFooter({ text: 'Lost Talent League // Identity + Competition' })
+
+  const recent = await channel.messages.fetch({ limit: 10 }).catch(() => null)
+  const existing = recent?.find(
+    (message) =>
+      message.author.id === discord.user.id
+      && message.embeds?.[0]?.title === 'LOST TALENT // PLAYER VERIFICATION',
+  )
+
+  if (existing) return existing.edit({ embeds: [embed] })
+  return channel.send({ embeds: [embed] })
+}
+
+async function persistGuildConfig(config) {
+  if (!db) return false
+
+  const { error } = await db
+    .from('discord_guild_configs')
+    .upsert(config, { onConflict: 'guild_id' })
+
+  if (error) throw error
+  return true
+}
+
+async function setupGuild(guild, configuredByDiscordId) {
+  if (String(guild.id) !== primaryGuildId) {
+    throw new Error('This bot is currently locked to Lost Talent server ' + primaryGuildId + '.')
+  }
+
+  const me = guild.members.me || await guild.members.fetch(discord.user.id)
+  const requiredPermissions = [
+    PermissionFlagsBits.ManageRoles,
+    PermissionFlagsBits.ManageChannels,
+    PermissionFlagsBits.ViewChannel,
+    PermissionFlagsBits.SendMessages,
+    PermissionFlagsBits.EmbedLinks,
+    PermissionFlagsBits.ReadMessageHistory,
+  ]
+
+  const missing = requiredPermissions.filter((permission) => !me.permissions.has(permission))
+  if (missing.length) {
+    throw new Error('The bot is missing required setup permissions. Re-invite it using the generated install URL.')
+  }
+
+  const staffRole = await findOrCreateRole(guild, 'LTL Staff', 0xd4aa3e, {
+    hoist: true,
+    mentionable: true,
+  })
+  const verifiedRole = await findOrCreateRole(guild, 'LTL Verified', 0xc9a53d)
+  const unverifiedRole = await findOrCreateRole(guild, 'LTL Unverified', 0x5b5b5b)
+  const freeAgentRole = await findOrCreateRole(guild, 'LTL Free Agent', 0x9a7a33)
+  const captainRole = await findOrCreateRole(guild, 'LTL Captain', 0xe0b94d)
+  const leaguePlayerRole = await findOrCreateRole(guild, 'LTL League Player', 0xb88a27)
+  const tournamentPlayerRole = await findOrCreateRole(guild, 'LTL Tournament Player', 0xa67820)
+  const eightsRole = await findOrCreateRole(guild, 'LTL 8s', 0x8d6f2a)
+
+  const category = await findOrCreateCategory(guild, 'LTL SYSTEM')
+
+  const verifyChannel = await findOrCreateTextChannel(
+    guild,
+    'ltl-verify',
+    category.id,
+    verifyChannelOverwrites(guild, staffRole.id),
+  )
+
+  const securityChannel = await findOrCreateTextChannel(
+    guild,
+    'ltl-security-alerts',
+    category.id,
+    privateStaffOverwrites(guild, staffRole.id),
+  )
+
+  const logsChannel = await findOrCreateTextChannel(
+    guild,
+    'ltl-bot-logs',
+    category.id,
+    privateStaffOverwrites(guild, staffRole.id),
+  )
+
+  await postVerificationInstructions(verifyChannel)
+
+  process.env.ROLE_VERIFIED_PLAYER = verifiedRole.id
+  process.env.ROLE_UNVERIFIED = unverifiedRole.id
+  process.env.ROLE_FREE_AGENT = freeAgentRole.id
+  process.env.ROLE_CAPTAIN = captainRole.id
+
+  const config = {
+    guild_id: guild.id,
+    guild_name: guild.name,
+    combined_org_league: true,
+    system_category_id: category.id,
+    verify_channel_id: verifyChannel.id,
+    security_alert_channel_id: securityChannel.id,
+    bot_logs_channel_id: logsChannel.id,
+    staff_role_id: staffRole.id,
+    verified_role_id: verifiedRole.id,
+    unverified_role_id: unverifiedRole.id,
+    free_agent_role_id: freeAgentRole.id,
+    captain_role_id: captainRole.id,
+    league_player_role_id: leaguePlayerRole.id,
+    tournament_player_role_id: tournamentPlayerRole.id,
+    eights_role_id: eightsRole.id,
+    configured_by_discord_id: String(configuredByDiscordId || ''),
+    configured_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }
+
+  const persisted = await persistGuildConfig(config)
+
+  const summary = new EmbedBuilder()
+    .setColor(0xd4aa3e)
+    .setTitle('LTL SERVER SETUP COMPLETE')
+    .setDescription(
+      persisted
+        ? 'Roles/channels were created or reused and their IDs were saved automatically.'
+        : 'Roles/channels were created or reused. Supabase is not connected yet, so rerun /ltl-setup after database setup to persist these IDs automatically.',
+    )
+    .addFields(
+      { name: 'Verified', value: '<@&' + verifiedRole.id + '> · ' + verifiedRole.id, inline: true },
+      { name: 'Unverified', value: '<@&' + unverifiedRole.id + '> · ' + unverifiedRole.id, inline: true },
+      { name: 'Free Agent', value: '<@&' + freeAgentRole.id + '> · ' + freeAgentRole.id, inline: true },
+      { name: 'Captain', value: '<@&' + captainRole.id + '> · ' + captainRole.id, inline: true },
+      { name: 'League Player', value: '<@&' + leaguePlayerRole.id + '> · ' + leaguePlayerRole.id, inline: true },
+      { name: 'Tournament Player', value: '<@&' + tournamentPlayerRole.id + '> · ' + tournamentPlayerRole.id, inline: true },
+      { name: '8s', value: '<@&' + eightsRole.id + '> · ' + eightsRole.id, inline: true },
+      { name: 'Staff', value: '<@&' + staffRole.id + '> · ' + staffRole.id, inline: true },
+      { name: 'Verify Channel', value: '<#' + verifyChannel.id + '> · ' + verifyChannel.id, inline: false },
+      { name: 'Security Alerts', value: '<#' + securityChannel.id + '> · ' + securityChannel.id, inline: false },
+      { name: 'Bot Logs', value: '<#' + logsChannel.id + '> · ' + logsChannel.id, inline: false },
+    )
+    .setTimestamp()
+
+  await logsChannel.send({ embeds: [summary] })
+
+  return { persisted }
+}
+
+async function registerGuildCommands(guild) {
+  await guild.commands.set([
+    {
+      name: 'ltl-setup',
+      description: 'Create or repair Lost Talent League system roles and channels.',
+      default_member_permissions: PermissionFlagsBits.Administrator.toString(),
+      dm_permission: false,
+    },
+    {
+      name: 'ltl-status',
+      description: 'Show Lost Talent bot/server integration status.',
+      default_member_permissions: PermissionFlagsBits.ManageGuild.toString(),
+      dm_permission: false,
+    },
+  ])
+}
+
 async function loadProfile(profileId) {
   if (!db) throw new Error('Supabase is not configured.')
   const { data, error } = await db
