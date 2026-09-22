@@ -56,6 +56,30 @@ function apiConfigured() {
   return Boolean(process.env.LTL_API_URL && process.env.LTL_EVENT_SECRET)
 }
 
+async function hydrateGuildConfigFromDatabase() {
+  if (!db) return false
+
+  const { data, error } = await db
+    .from('discord_guild_configs')
+    .select('verified_role_id,unverified_role_id,free_agent_role_id,captain_role_id,staff_role_id,security_alert_channel_id')
+    .eq('guild_id', primaryGuildId)
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data) return false
+
+  if (data.verified_role_id) process.env.ROLE_VERIFIED_PLAYER = String(data.verified_role_id)
+  if (data.unverified_role_id) process.env.ROLE_UNVERIFIED = String(data.unverified_role_id)
+  if (data.free_agent_role_id) process.env.ROLE_FREE_AGENT = String(data.free_agent_role_id)
+  if (data.captain_role_id) process.env.ROLE_CAPTAIN = String(data.captain_role_id)
+  if (data.staff_role_id) process.env.DISCORD_STAFF_ROLE_ID = String(data.staff_role_id)
+  if (data.security_alert_channel_id) {
+    process.env.DISCORD_SECURITY_ALERT_CHANNEL_ID = String(data.security_alert_channel_id)
+  }
+
+  return true
+}
+
 function unverifiedRole(scope) {
   return String(
     scope === 'org'
@@ -407,6 +431,11 @@ async function registerGuildCommands(guild) {
       default_member_permissions: PermissionFlagsBits.ManageGuild.toString(),
       dm_permission: false,
     },
+    {
+      name: 'verify',
+      description: 'DM yourself a one-time Lost Talent player verification link.',
+      dm_permission: false,
+    },
   ])
 }
 
@@ -620,6 +649,14 @@ discord.once(Events.ClientReady, async (client) => {
 
   const guild = await client.guilds.fetch(primaryGuildId).catch(() => null)
   if (guild) {
+    await hydrateGuildConfigFromDatabase()
+      .then((loaded) => {
+        if (loaded) console.log('Loaded Lost Talent Discord role/channel configuration from Supabase')
+      })
+      .catch((error) => {
+        console.error('Unable to load persisted LTL guild configuration:', error)
+      })
+
     await registerGuildCommands(guild).catch((error) => {
       console.error('Unable to register LTL commands:', error)
     })
@@ -673,6 +710,37 @@ discord.on(Events.InteractionCreate, async (interaction) => {
           ].join('\n')),
       ],
     })
+    return
+  }
+
+  if (interaction.commandName === 'verify') {
+    await interaction.deferReply({ ephemeral: true })
+
+    try {
+      const member = await interaction.guild.members.fetch(interaction.user.id)
+      const scope = scopeForGuild(interaction.guild.id)
+      if (!scope) throw new Error('This server is not configured for Lost Talent verification.')
+
+      const profile = await loadProfileByDiscord(interaction.user.id)
+      if (profile?.verification_status === 'verified') {
+        const restored = await reconcileMember(member, profile, scope)
+        await interaction.editReply(
+          `You are already verified. I also reconciled ${restored} active Lost Talent role entitlement(s).`,
+        )
+        return
+      }
+
+      await sendIntentVerification(member, scope)
+      await interaction.editReply(
+        'I sent your one-time Lost Talent verification link by DM. The link expires in 15 minutes.',
+      )
+    } catch (error) {
+      console.error(`Unable to send verification link to ${interaction.user.tag}:`, error)
+      await interaction.editReply(
+        'I could not send the verification link: ' + String(error?.message || error)
+        + ' Make sure your DMs from this server are enabled and try again.',
+      )
+    }
   }
 })
 
