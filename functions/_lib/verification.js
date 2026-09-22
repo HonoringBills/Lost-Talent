@@ -173,20 +173,39 @@ export async function createVerificationToken(env, guildScope, discordUserId) {
   return { rawToken, expiresInSeconds: TOKEN_TTL_MS / 1000 }
 }
 
-export function roleForVerified(env, guildScope) {
-  return String(
-    guildScope === 'org'
-      ? (env.ROLE_ORG_VERIFIED_PLAYER || env.ROLE_VERIFIED_PLAYER || '')
-      : (env.ROLE_LEAGUE_VERIFIED_PLAYER || env.ROLE_VERIFIED_PLAYER || ''),
-  ).trim()
+export function guildIdForScope(env, guildScope) {
+  const primary = String(env.PRIMARY_GUILD_ID || '1537667566502154381').trim()
+  if (guildScope === 'org') return String(env.ORG_GUILD_ID || primary).trim()
+  return String(env.LEAGUE_GUILD_ID || primary).trim()
 }
 
-export function roleForUnverified(env, guildScope) {
-  return String(
-    guildScope === 'org'
-      ? (env.ROLE_ORG_UNVERIFIED || env.ROLE_UNVERIFIED || '')
-      : (env.ROLE_LEAGUE_UNVERIFIED || env.ROLE_UNVERIFIED || ''),
+export async function getGuildConfig(env, guildScope) {
+  const guildId = guildIdForScope(env, guildScope)
+  const rows = await db(
+    env,
+    `discord_guild_configs?select=*&guild_id=eq.${encodeURIComponent(guildId)}&limit=1`,
+  )
+  return rows?.[0] || null
+}
+
+export async function verificationRoleIds(env, guildScope) {
+  const config = await getGuildConfig(env, guildScope).catch(() => null)
+
+  const verified = String(
+    config?.verified_role_id
+      || (guildScope === 'org'
+        ? (env.ROLE_ORG_VERIFIED_PLAYER || env.ROLE_VERIFIED_PLAYER || '')
+        : (env.ROLE_LEAGUE_VERIFIED_PLAYER || env.ROLE_VERIFIED_PLAYER || '')),
   ).trim()
+
+  const unverified = String(
+    config?.unverified_role_id
+      || (guildScope === 'org'
+        ? (env.ROLE_ORG_UNVERIFIED || env.ROLE_UNVERIFIED || '')
+        : (env.ROLE_LEAGUE_UNVERIFIED || env.ROLE_UNVERIFIED || '')),
+  ).trim()
+
+  return { verified, unverified, config }
 }
 
 export async function queueRoleJob(env, profileId, guildScope, action, roleId, payload = {}) {
@@ -226,9 +245,12 @@ export async function ensureEntitlement(env, profileId, guildScope, roleId, sour
 }
 
 export async function alertDuplicate(env, guildScope, currentId, matchedId, fingerprint, reason = 'shared_network_fingerprint') {
-  const channelId = String(env.DISCORD_SECURITY_ALERT_CHANNEL_ID || '').trim()
+  const config = await getGuildConfig(env, guildScope).catch(() => null)
+  const channelId = String(
+    config?.security_alert_channel_id || env.DISCORD_SECURITY_ALERT_CHANNEL_ID || '',
+  ).trim()
   if (!channelId) return null
-  const staffRole = String(env.DISCORD_STAFF_ROLE_ID || '').trim()
+  const staffRole = String(config?.staff_role_id || env.DISCORD_STAFF_ROLE_ID || '').trim()
   const reasonText = reason === 'activision_identity_conflict'
     ? 'The submitted Activision ID is already linked to a different Discord account.'
     : 'The same privacy-preserving network fingerprint was observed on two Discord accounts during verification.'
