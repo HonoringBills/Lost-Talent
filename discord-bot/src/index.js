@@ -736,9 +736,14 @@ discord.on(Events.InteractionCreate, async (interaction) => {
       )
     } catch (error) {
       console.error(`Unable to send verification link to ${interaction.user.tag}:`, error)
+      const message = String(error?.message || error)
+      const authFailure = /unauthorized/i.test(message)
+
       await interaction.editReply(
-        'I could not send the verification link: ' + String(error?.message || error)
-        + ' Make sure your DMs from this server are enabled and try again.',
+        authFailure
+          ? 'The Lost Talent verification service rejected the bot authentication. Staff needs to repair the verification service secret before you can continue.'
+          : 'I could not send the verification link: ' + message
+            + ' Make sure your DMs from this server are enabled and try again.',
       )
     }
   }
