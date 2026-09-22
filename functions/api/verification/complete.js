@@ -12,9 +12,8 @@ import {
   normalizeActivision,
   queueRoleJob,
   required,
-  roleForUnverified,
-  roleForVerified,
   sha256Base64Url,
+  verificationRoleIds,
 } from '../../_lib/verification.js'
 
 function result(ok, message) {
@@ -263,8 +262,10 @@ export async function onRequestPost({ request, env }) {
     }),
   })
 
-  const verifiedRole = roleForVerified(env, token.guild_scope)
-  const unverifiedRole = roleForUnverified(env, token.guild_scope)
+  const {
+    verified: verifiedRole,
+    unverified: unverifiedRole,
+  } = await verificationRoleIds(env, token.guild_scope)
 
   if (verifiedRole) {
     await ensureEntitlement(env, profile.id, token.guild_scope, verifiedRole, 'verified_player', '')
