@@ -41,12 +41,19 @@ export function relayAuthorized(request, env) {
 }
 
 export async function db(env, path, options = {}) {
-  required(env, ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'])
+  required(env, ['SUPABASE_URL'])
+  const supabaseSecret = String(
+    env.SUPABASE_SECRET_KEY || env.SUPABASE_SERVICE_ROLE_KEY || '',
+  ).trim()
+  if (!supabaseSecret) {
+    throw new Error('Missing configuration: SUPABASE_SECRET_KEY')
+  }
+
   const response = await fetch(`${String(env.SUPABASE_URL).replace(/\/$/, '')}/rest/v1/${path}`, {
     ...options,
     headers: {
-      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      apikey: supabaseSecret,
+      Authorization: `Bearer ${supabaseSecret}`,
       'Content-Type': 'application/json',
       ...(options.headers || {}),
     },
