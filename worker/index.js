@@ -22,6 +22,12 @@ import {
   onAdminStaff,
   onPublicCompetition,
 } from '../functions/api/operations.js'
+import {
+  onAdminTournamentEntry,
+  onAdminTournamentState,
+  onPublicTournament,
+  onRegisterTournament,
+} from '../functions/api/tournaments.js'
 
 function methodNotAllowed() {
   return new Response('Method Not Allowed', { status: 405 })
@@ -33,31 +39,25 @@ export default {
 
     try {
       if (url.pathname === '/api/public/state') {
-        return request.method === 'GET'
-          ? onPublicState({ request, env, ctx })
-          : methodNotAllowed()
+        return request.method === 'GET' ? onPublicState({ request, env, ctx }) : methodNotAllowed()
       }
-
       if (url.pathname === '/api/public/competition') {
-        return request.method === 'GET'
-          ? onPublicCompetition({ request, env, ctx })
-          : methodNotAllowed()
+        return request.method === 'GET' ? onPublicCompetition({ request, env, ctx }) : methodNotAllowed()
       }
-
-      if (url.pathname === '/api/registration/team') {
-        return onRegisterTeam({ request, env, ctx })
+      if (url.pathname === '/api/public/tournament') {
+        return request.method === 'GET' ? onPublicTournament({ request, env, ctx }) : methodNotAllowed()
       }
+      if (url.pathname === '/api/registration/team') return onRegisterTeam({ request, env, ctx })
+      if (url.pathname === '/api/registration/tournament') return onRegisterTournament({ request, env, ctx })
 
       if (url.pathname === '/api/admin/me') {
-        return request.method === 'GET'
-          ? onAdminMe({ request, env, ctx })
-          : methodNotAllowed()
+        return request.method === 'GET' ? onAdminMe({ request, env, ctx }) : methodNotAllowed()
       }
-
       if (url.pathname === '/api/admin/ops-state') {
-        return request.method === 'GET'
-          ? onAdminOpsState({ request, env, ctx })
-          : methodNotAllowed()
+        return request.method === 'GET' ? onAdminOpsState({ request, env, ctx }) : methodNotAllowed()
+      }
+      if (url.pathname === '/api/admin/tournament-state') {
+        return request.method === 'GET' ? onAdminTournamentState({ request, env, ctx }) : methodNotAllowed()
       }
 
       if (url.pathname === '/api/admin/content') return onAdminContent({ request, env, ctx })
@@ -65,6 +65,7 @@ export default {
       if (url.pathname === '/api/admin/org-team') return onAdminOrgTeam({ request, env, ctx })
       if (url.pathname === '/api/admin/league-team') return onAdminLeagueTeam({ request, env, ctx })
       if (url.pathname === '/api/admin/tournament') return onAdminTournament({ request, env, ctx })
+      if (url.pathname === '/api/admin/tournament-entry') return onAdminTournamentEntry({ request, env, ctx })
       if (url.pathname === '/api/admin/match') return onAdminMatch({ request, env, ctx })
       if (url.pathname === '/api/admin/map-report') return onAdminMapReport({ request, env, ctx })
       if (url.pathname === '/api/admin/roster-slot') return onAdminRosterSlot({ request, env, ctx })
@@ -73,27 +74,16 @@ export default {
       if (url.pathname === '/api/admin/staff') return onAdminStaff({ request, env, ctx })
 
       if (url.pathname === '/api/verification/start') {
-        return request.method === 'POST'
-          ? startVerification({ request, env, ctx })
-          : methodNotAllowed()
+        return request.method === 'POST' ? startVerification({ request, env, ctx }) : methodNotAllowed()
       }
-
       if (url.pathname === '/api/verification/complete') {
-        return request.method === 'POST'
-          ? completeVerification({ request, env, ctx })
-          : methodNotAllowed()
+        return request.method === 'POST' ? completeVerification({ request, env, ctx }) : methodNotAllowed()
       }
-
       if (url.pathname === '/api/verification/member-leave') {
-        return request.method === 'POST'
-          ? memberLeave({ request, env, ctx })
-          : methodNotAllowed()
+        return request.method === 'POST' ? memberLeave({ request, env, ctx }) : methodNotAllowed()
       }
-
       if (url.pathname === '/verify') {
-        return request.method === 'GET'
-          ? verificationPage({ request, env, ctx })
-          : methodNotAllowed()
+        return request.method === 'GET' ? verificationPage({ request, env, ctx }) : methodNotAllowed()
       }
 
       return env.ASSETS.fetch(request)
