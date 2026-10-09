@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Route, Routes } from 'react-router-dom'
 import { getCurrentSession, onAuthStateChange, signInWithDiscord, signOut } from './supabase.js'
+import { LeagueMatches, StatsBoard } from './CompetitionData.jsx'
+import StaffOps from './StaffOps.jsx'
 
 const DEFAULT_CONTENT = {
   brand: {
@@ -166,6 +168,7 @@ function League({ state }) {
   return <Page title="Lost Talent League" kicker={season ? `LTL • ${season.name}` : 'LTL'} copy="Verified competition for teams ready to earn their place.">
     <div className="league-brand-hero"><LeagueMark className="league-brand-logo" /><div><span className="kicker">OFFICIAL LEAGUE</span><h2>{season?.name || 'Next season coming soon'}</h2><p>{season ? `Season status: ${season.status}.` : 'Registration and season dates will be announced here.'}</p></div></div>
     {state.leagueTeams.length ? <div className="card-grid three">{state.leagueTeams.map((team) => <article className="card" key={team.id}><span className="pill">{team.seed ? `Seed #${team.seed}` : 'Approved'}</span><h3>{team.name}</h3><p>{team.tag || 'Lost Talent League'}</p></article>)}</div> : <EmptyState title={season?.status === 'registration' ? 'Registration is open' : 'Teams will appear here'} copy={season?.status === 'registration' ? 'Approved teams will populate this page as registrations are reviewed.' : 'No approved teams have been published for the current season.'} />}
+    <div className="inner-section"><LeagueMatches /></div>
     <div className="card-grid two inner-section"><div className="card"><span className="kicker">REGISTRATION</span><h3>{state.content.registration?.enabled ? 'Open' : 'Closed'}</h3><p>{state.content.registration?.message}</p>{state.content.registration?.enabled && <Link className="button gold full" to="/register">Register Team</Link>}</div><div className="card"><span className="kicker">ROSTER LOCK</span><h3>{formatDate(season?.roster_lock_at)}</h3><p>Roster deadlines are controlled by league staff and shown here when set.</p></div></div>
   </Page>
 }
@@ -177,7 +180,7 @@ function Tournaments({ state }) {
 }
 
 function Stats() {
-  return <Page title="Player Statistics" kicker="DATA CENTER" copy="Official statistics are published from completed Lost Talent League and tournament matches."><EmptyState title="Stats populate from reported matches" copy="Once official match reports are recorded, player leaderboards will appear here automatically." /></Page>
+  return <Page title="Player Statistics" kicker="DATA CENTER" copy="Official statistics from completed Lost Talent League matches."><StatsBoard /></Page>
 }
 
 function Eights({ state }) {
@@ -285,6 +288,7 @@ function Staff() {
     <section className="inner-section"><SectionHeader kicker="ORG TEAMS" title="Lost Talent rosters" copy="Create or update teams shown on the public Teams page." /><div className="admin-grid">{admin.orgTeams.map((team) => <OrgTeamEditor key={team.id} team={team} token={session.access_token} onSaved={loadAdmin} setError={setError} />)}<OrgTeamEditor token={session.access_token} onSaved={loadAdmin} setError={setError} /></div></section>
     <section className="inner-section"><SectionHeader kicker="LEAGUE TEAMS" title="Registration review" copy="Approve, reject, seed or rename registered teams." />{admin.leagueTeams?.length ? <div className="admin-grid">{admin.leagueTeams.map((team) => <LeagueTeamEditor key={team.id} team={team} token={session.access_token} onSaved={loadAdmin} setError={setError} />)}</div> : <EmptyState title="No registrations yet" copy="Pending team registrations will appear here." />}</section>
     <section className="inner-section"><SectionHeader kicker="TOURNAMENTS" title="Event management" copy="Create and update Lost Talent tournament listings." /><div className="admin-grid">{admin.tournaments.map((tournament) => <TournamentEditor key={tournament.id} tournament={tournament} token={session.access_token} onSaved={loadAdmin} setError={setError} />)}<TournamentEditor token={session.access_token} onSaved={loadAdmin} setError={setError} /></div></section>
+    <StaffOps token={session.access_token} admin={admin} setError={setError} onBaseRefresh={loadAdmin} />
   </Page>
 }
 

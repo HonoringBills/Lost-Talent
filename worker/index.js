@@ -12,6 +12,16 @@ import {
   onPublicState,
   onRegisterTeam,
 } from '../functions/api/site.js'
+import {
+  onAdminEightLadder,
+  onAdminEightRating,
+  onAdminMapReport,
+  onAdminMatch,
+  onAdminOpsState,
+  onAdminRosterSlot,
+  onAdminStaff,
+  onPublicCompetition,
+} from '../functions/api/operations.js'
 
 function methodNotAllowed() {
   return new Response('Method Not Allowed', { status: 405 })
@@ -28,6 +38,12 @@ export default {
           : methodNotAllowed()
       }
 
+      if (url.pathname === '/api/public/competition') {
+        return request.method === 'GET'
+          ? onPublicCompetition({ request, env, ctx })
+          : methodNotAllowed()
+      }
+
       if (url.pathname === '/api/registration/team') {
         return onRegisterTeam({ request, env, ctx })
       }
@@ -38,25 +54,23 @@ export default {
           : methodNotAllowed()
       }
 
-      if (url.pathname === '/api/admin/content') {
-        return onAdminContent({ request, env, ctx })
+      if (url.pathname === '/api/admin/ops-state') {
+        return request.method === 'GET'
+          ? onAdminOpsState({ request, env, ctx })
+          : methodNotAllowed()
       }
 
-      if (url.pathname === '/api/admin/season') {
-        return onAdminSeason({ request, env, ctx })
-      }
-
-      if (url.pathname === '/api/admin/org-team') {
-        return onAdminOrgTeam({ request, env, ctx })
-      }
-
-      if (url.pathname === '/api/admin/league-team') {
-        return onAdminLeagueTeam({ request, env, ctx })
-      }
-
-      if (url.pathname === '/api/admin/tournament') {
-        return onAdminTournament({ request, env, ctx })
-      }
+      if (url.pathname === '/api/admin/content') return onAdminContent({ request, env, ctx })
+      if (url.pathname === '/api/admin/season') return onAdminSeason({ request, env, ctx })
+      if (url.pathname === '/api/admin/org-team') return onAdminOrgTeam({ request, env, ctx })
+      if (url.pathname === '/api/admin/league-team') return onAdminLeagueTeam({ request, env, ctx })
+      if (url.pathname === '/api/admin/tournament') return onAdminTournament({ request, env, ctx })
+      if (url.pathname === '/api/admin/match') return onAdminMatch({ request, env, ctx })
+      if (url.pathname === '/api/admin/map-report') return onAdminMapReport({ request, env, ctx })
+      if (url.pathname === '/api/admin/roster-slot') return onAdminRosterSlot({ request, env, ctx })
+      if (url.pathname === '/api/admin/eights-ladder') return onAdminEightLadder({ request, env, ctx })
+      if (url.pathname === '/api/admin/eights-rating') return onAdminEightRating({ request, env, ctx })
+      if (url.pathname === '/api/admin/staff') return onAdminStaff({ request, env, ctx })
 
       if (url.pathname === '/api/verification/start') {
         return request.method === 'POST'
