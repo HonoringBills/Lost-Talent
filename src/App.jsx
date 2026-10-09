@@ -187,7 +187,7 @@ function Eights({ state }) {
 }
 
 function Leaderboard({ ladder }) {
-  return <div className="card leaderboard"><div className="panel-top"><div><span className="kicker">{ladder.guild_scope === 'org' ? 'Main Discord' : 'League Discord'}</span><h3>{ladder.name}</h3></div><span className="pill">ELO</span></div>{ladder.ratings?.length ? ladder.ratings.map((row, index) => <div className="leader-row" key={row.profile_id}><b>#{index + 1}</b><span>{row.profile?.display_name || row.profile?.discord_username || row.profile?.activision_id || 'Verified Player'}</span><strong>{row.rating}</strong></div>) : <p className="muted">No ranked players yet.</p>}</div>
+  return <div className="card leaderboard"><div className="panel-top"><div><span className="kicker">{ladder.scope === 'org_community' ? 'Main Discord' : 'League Discord'}</span><h3>{ladder.name}</h3></div><span className="pill">ELO</span></div>{ladder.ratings?.length ? ladder.ratings.map((row, index) => <div className="leader-row" key={row.profile_id}><b>#{index + 1}</b><span>{row.profile?.display_name || row.profile?.discord_username || row.profile?.activision_id || 'Verified Player'}</span><strong>{row.elo}</strong></div>) : <p className="muted">No ranked players yet.</p>}</div>
 }
 
 function Verify() {

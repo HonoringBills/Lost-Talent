@@ -26,7 +26,7 @@ async function publicState(env, includePrivate = false) {
     db(env, 'league_seasons?select=*&order=created_at.desc&limit=10'),
     db(env, 'tournaments?select=*&order=starts_at.asc.nullslast,created_at.desc'),
     db(env, 'eight_ladders?select=*&order=name.asc'),
-    db(env, 'eight_ratings?select=ladder_id,profile_id,rating,wins,losses,streak&order=rating.desc&limit=200'),
+    db(env, 'eight_ratings?select=ladder_id,profile_id,elo,wins,losses,streak&order=elo.desc&limit=200'),
   ])
 
   const season = (seasons || []).find((row) => !['archived'].includes(row.status)) || seasons?.[0] || null
