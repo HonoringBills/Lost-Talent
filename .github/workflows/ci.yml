@@ -23,9 +23,11 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Build web app
         run: npm run build
-      - name: Syntax check Cloudflare verification functions
+      - name: Syntax check Cloudflare functions
         run: |
           node --check functions/_lib/verification.js
+          node --check functions/_lib/site.js
+          node --check functions/api/site.js
           node --check functions/api/verification/start.js
           node --check functions/api/verification/complete.js
           node --check functions/api/verification/member-leave.js
