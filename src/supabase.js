@@ -17,7 +17,7 @@ export const supabase = supabaseConfigured
     })
   : null
 
-export async function signInWithDiscord(next = '/staff') {
+export async function signInWithDiscord(next = '/#/staff') {
   if (!supabase) return { error: new Error('Sign-in is not configured yet.') }
 
   return supabase.auth.signInWithOAuth({
